@@ -50,18 +50,23 @@ app.set('trust proxy', 1);
 // Security middleware
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 
-const allowedOrigins = [
-  process.env.CLIENT_URL || 'http://localhost:5173',
-  process.env.ADMIN_URL || 'http://localhost:5174',
+const rawOrigins = [
+  ...(process.env.CLIENT_URL ? process.env.CLIENT_URL.split(',') : ['http://localhost:5173']),
+  ...(process.env.ADMIN_URL ? process.env.ADMIN_URL.split(',') : ['http://localhost:5174']),
   'http://localhost:5173',
   'http://localhost:5174',
-].filter(Boolean);
+];
+
+const allowedOrigins = rawOrigins
+  .map((o) => o.trim().replace(/\/+$/, ''))
+  .filter(Boolean);
 
 app.use(
   cors({
     origin: (origin, callback) => {
       // Allow requests with no origin (like mobile apps, curl, server-to-server)
       if (!origin) return callback(null, true);
+      const cleanOrigin = origin.replace(/\/+$/, '');
       // In development or local/LAN testing, permit any localhost, 127.0.0.1, or local subnet
       if (
         process.env.NODE_ENV !== 'production' ||
@@ -72,7 +77,11 @@ app.use(
       ) {
         return callback(null, true);
       }
-      if (allowedOrigins.includes(origin)) {
+      if (
+        allowedOrigins.includes(cleanOrigin) ||
+        cleanOrigin.endsWith('.netlify.app') ||
+        cleanOrigin.endsWith('.vercel.app')
+      ) {
         return callback(null, true);
       }
       return callback(null, false);
@@ -92,9 +101,30 @@ app.use(cookieParser());
 // Request logger for production visibility
 app.use(requestLogger);
 
+// Database auto-connection middleware for serverless (Vercel) cold starts
+app.use(async (req, res, next) => {
+  if (!isDbConnected()) {
+    try {
+      await connectDB();
+    } catch (e) {
+      console.error('Serverless DB connection error:', e.message);
+    }
+  }
+  next();
+});
+
 // ==========================================
 // Health & Liveness / Readiness Checks
 // ==========================================
+app.get('/', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    service: 'SVARA API Server',
+    version: '1.0.0',
+    health: '/api/health',
+  });
+});
+
 app.get('/health/live', (req, res) => {
   res.status(200).json({
     status: 'live',
@@ -163,29 +193,45 @@ app.use('*', (req, res) => {
 // Centralized error handler (must be last)
 app.use(errorHandler);
 
-// Start server
-const PORT = process.env.PORT || 5000;
-
-const start = async () => {
+// Database and bootstrap initialization helper
+let isInitialized = false;
+export const initApp = async () => {
+  if (isInitialized) return;
   await connectDB();
-  await ensureAdminUser();
-  await syncDefaultCategories();
-  const stopExpiry = startOrderExpiryJob();
-  const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 SVARA Backend running on http://localhost:${PORT}`);
-    console.log(`📦 VTO Provider: ${process.env.VTO_PROVIDER || 'gemini'}`);
-    console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  });
-
-  // Graceful shutdown
-  const shutdown = () => {
-    console.log('Shutting down gracefully...');
-    stopExpiry();
-    server.close(() => process.exit(0));
-  };
-
-  process.on('SIGTERM', shutdown);
-  process.on('SIGINT', shutdown);
+  try {
+    await ensureAdminUser();
+    await syncDefaultCategories();
+  } catch (err) {
+    console.warn('Bootstrap warning:', err.message);
+  }
+  isInitialized = true;
 };
 
-start();
+// Start standalone HTTP server only when not running in serverless environment (e.g. Vercel)
+if (!process.env.VERCEL) {
+  const PORT = process.env.PORT || 5000;
+
+  const start = async () => {
+    await initApp();
+    const stopExpiry = startOrderExpiryJob();
+    const server = app.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 SVARA Backend running on http://localhost:${PORT}`);
+      console.log(`📦 VTO Provider: ${process.env.VTO_PROVIDER || 'gemini'}`);
+      console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+    });
+
+    // Graceful shutdown
+    const shutdown = () => {
+      console.log('Shutting down gracefully...');
+      stopExpiry();
+      server.close(() => process.exit(0));
+    };
+
+    process.on('SIGTERM', shutdown);
+    process.on('SIGINT', shutdown);
+  };
+
+  start();
+}
+
+export default app;

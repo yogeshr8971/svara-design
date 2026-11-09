@@ -1,8 +1,9 @@
 import axios from 'axios';
 
 // Respect VITE_API_URL in production or default to relative /api
-const baseURL = import.meta.env.VITE_API_URL
-  ? import.meta.env.VITE_API_URL.replace(/\/+$/, '') + '/api'
+const rawBase = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.trim().replace(/\/+$/, '') : '';
+const baseURL = rawBase
+  ? (rawBase.endsWith('/api') ? rawBase : `${rawBase}/api`)
   : '/api';
 
 const api = axios.create({
