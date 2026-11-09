@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-ivory-50 text-charcoal-700 antialiased font-body selection:bg-champagne-300 selection:text-charcoal-800;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-white/80 backdrop-blur-md border border-white/60 shadow-sm;
+  }
+  .glass-card {
+    @apply bg-white/90 backdrop-blur-md border border-ivory-300/70 shadow-sm rounded-2xl;
+  }
+  .input-field {
+    @apply w-full px-3.5 py-2.5 rounded-xl border border-ivory-300 bg-white/90 text-charcoal-700 text-sm focus:outline-none focus:ring-2 focus:ring-burgundy-500/30 focus:border-burgundy-500 transition-all placeholder:text-charcoal-300;
+  }
+  .section-heading {
+    @apply font-display text-2xl font-bold text-charcoal-800 tracking-tight;
+  }
+}
