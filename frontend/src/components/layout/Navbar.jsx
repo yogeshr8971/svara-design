@@ -234,7 +234,7 @@ export default function Navbar() {
                         {/* Admin Portal Link */}
                         {isAdmin && (
                           <a
-                            href={import.meta.env.VITE_ADMIN_URL || 'http://localhost:5174'}
+                            href={import.meta.env.VITE_ADMIN_URL || 'https://svara-admin.netlify.app/'}
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={() => setProfileDropdownOpen(false)}
