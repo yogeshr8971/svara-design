@@ -19,7 +19,7 @@ const userSchema = new mongoose.Schema(
     password: { type: String, required: [true, 'Password is required'], minlength: 6, select: false },
     role: { type: String, enum: ['user', 'seller', 'admin'], default: 'user' },
     isRootAdmin: { type: Boolean, default: false },
-    
+
     // Account blocking
     isBlocked: { type: Boolean, default: false },
     blockedReason: { type: String, default: '' },
@@ -30,9 +30,9 @@ const userSchema = new mongoose.Schema(
     deletedAt: { type: Date, default: null },
 
     // Customer profile fields
-    phone: { type: String, trim: true }, // stored as E.164 (+91XXXXXXXXXX)
+    phone: { type: String, trim: true }, // stored as E.164 (+91XXXXXXXXXX); collected but not SMS-verified
     emailVerified: { type: Boolean, default: false },
-    phoneVerified: { type: Boolean, default: false },
+    // phoneVerified removed — verification is email-only now
     profileImage: { type: String },
     addresses: [addressSchema],
 
@@ -56,12 +56,8 @@ userSchema.index({ role: 1 });
 userSchema.index({ isBlocked: 1 });
 userSchema.index({ isDeleted: 1 });
 userSchema.index({ isRootAdmin: 1 });
-
-// A verified phone number can belong to only one account.
-userSchema.index(
-  { phone: 1 },
-  { unique: true, partialFilterExpression: { phoneVerified: true, phone: { $type: 'string' } } }
-);
+// Partial phone uniqueness index removed (was tied to phoneVerified which is gone).
+// See: npm run migrate:phone-index to drop the old index from existing collections.
 userSchema.index({ sellerStatus: 1 });
 
 userSchema.pre('save', async function (next) {

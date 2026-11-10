@@ -271,7 +271,6 @@ export const deleteUserAccount = asyncHandler(async (req, res) => {
   target.name = `[Deleted User ${target._id.toString().slice(-4)}]`;
   target.email = `deleted_${target._id}@deleted.svara.internal`;
   target.phone = undefined;
-  target.phoneVerified = false;
   target.emailVerified = false;
   target.password = 'DELETED_ACCOUNT_NOLOGIN';
   target.addresses = [];

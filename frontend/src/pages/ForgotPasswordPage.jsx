@@ -6,7 +6,7 @@ import Button from '../components/ui/Button';
 import * as authService from '../services/authService';
 import toast from 'react-hot-toast';
 
-// Must match backend EMAIL_CODE_EXPIRY_MS = 3 * 60 * 1000 (3 minutes)
+// Must match backend OTP_TTL_MS = Math.max(3, Number(process.env.OTP_TTL_MINUTES) || 3) * 60 * 1000 (at least 3 minutes = 180s)
 const CODE_EXPIRY_SECONDS = 180;
 
 function formatCountdown(seconds) {

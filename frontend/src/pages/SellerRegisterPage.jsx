@@ -159,7 +159,7 @@ export default function SellerRegisterPage() {
               required
             />
             <Input
-              label="Mobile Number (verified by SMS)"
+              label="Mobile Number"
               name="phone"
               type="tel"
               placeholder="10-digit mobile number"

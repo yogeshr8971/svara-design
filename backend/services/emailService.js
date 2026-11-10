@@ -1,6 +1,9 @@
 import nodemailer from 'nodemailer';
+import { OTP_TTL_MS } from './otpService.js';
 
 let transporter = null;
+
+const getOtpMinutes = () => Math.round((OTP_TTL_MS || 3 * 60 * 1000) / 60000);
 
 const isConfigured = () => Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
 
@@ -75,7 +78,6 @@ export const sendEmail = async ({ to, subject, html, text, strict = false, retri
         if (strict) throw err;
         return false;
       }
-      // Wait before retry
       await new Promise((r) => setTimeout(r, attempt * 1000));
     }
   }
@@ -83,6 +85,7 @@ export const sendEmail = async ({ to, subject, html, text, strict = false, retri
 };
 
 export const sendOtpEmail = (to, code, purpose) => {
+  const minutes = getOtpMinutes();
   const titles = {
     login: { subject: `${code} is your SVARA sign-in code`, heading: 'Confirm your sign-in', action: 'finish signing in' },
     register: { subject: `${code} is your SVARA verification code`, heading: 'Verify your email address', action: 'verify your email' },
@@ -98,9 +101,9 @@ export const sendOtpEmail = (to, code, purpose) => {
       heading: config.heading,
       bodyHtml: `<p>Use this code to ${config.action}:</p>
         <p style="font-size:34px;letter-spacing:10px;font-weight:700;margin:20px 0;color:#242019">${esc(code)}</p>
-        <p>The code expires in <strong>3 minutes</strong>. If you didn't request it, you can ignore this email — your account remains secure.</p>`,
+        <p>The code expires in <strong>${minutes} minutes</strong>. If you didn't request it, you can ignore this email — your account remains secure.</p>`,
     }),
-    text: `Your SVARA code is ${code}. It expires in 3 minutes.`,
+    text: `Your SVARA code is ${code}. It expires in ${minutes} minutes.`,
   });
 };
 

@@ -72,10 +72,10 @@ export default function RegisterPage() {
             <Input label="Password" type="password" icon={Lock} placeholder="At least 8 characters" autoComplete="new-password" value={form.password} onChange={set('password')} required />
             <Input label="Confirm Password" type="password" icon={Lock} placeholder="Confirm password" autoComplete="new-password" value={form.confirmPassword} onChange={set('confirmPassword')} required />
             <Button type="submit" variant="primary" size="lg" loading={loading} className="w-full justify-center mt-2">
-              <span>Send verification codes</span>
+              <span>Send verification code</span>
               <ArrowRight size={16} />
             </Button>
-            <p className="text-center text-[11px] text-charcoal-400">We'll verify your email and mobile number with one-time codes.</p>
+            <p className="text-center text-[11px] text-charcoal-400">We'll verify your email with a one-time code.</p>
           </form>
         )}
 

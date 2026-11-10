@@ -222,7 +222,7 @@ export default function CustomersPage() {
                     </td>
                     <td className="p-3.5 text-charcoal-700">{u.email}</td>
                     <td className="p-3.5 text-charcoal-600">
-                      {u.phone || '—'} {u.phoneVerified && <span className="text-emerald-600">✓</span>}
+                      {u.phone || '—'}
                     </td>
                     <td className="p-3.5 font-bold text-charcoal-800">{u.credits ?? 0}</td>
                     <td className="p-3.5">

@@ -1,15 +1,15 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Mail, Smartphone, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Mail, ShieldCheck, AlertTriangle } from 'lucide-react';
 import Button from '../ui/Button';
 import { useAuth } from '../../context/AuthContext';
 import * as authService from '../../services/authService';
 import toast from 'react-hot-toast';
 
-// Must match backend EMAIL_CODE_EXPIRY_MS = 60 * 1000
-const CODE_EXPIRY_SECONDS = 60;
+// Must match backend OTP_TTL_MS = Math.max(3, OTP_TTL_MINUTES || 3) * 60 * 1000 (≥ 3 minutes = 180 seconds)
+const CODE_EXPIRY_SECONDS = 180;
 
 /**
- * Formats remaining seconds as MM:SS string, e.g. 59 → "00:59"
+ * Formats remaining seconds as MM:SS string, e.g. 125 → "02:05"
  */
 function formatCountdown(seconds) {
   const m = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -19,7 +19,7 @@ function formatCountdown(seconds) {
 
 /**
  * A single-code input field with:
- * - 60-second expiry countdown
+ * - 3-minute (180-second) expiry countdown
  * - Disabled submission when expired
  * - Expired message and resend button
  */
@@ -61,21 +61,21 @@ function CodeInput({ value, onChange, label, icon: Icon, hint, onResend, resendC
  * OtpStep — handles email code verification for login and registration.
  *
  * mode 'login'    → one email code
- * mode 'register' → email code + mobile code
+ * mode 'register' → one email code (phone/SMS step removed)
  *
- * Each code expires after exactly 60 seconds (also enforced server-side).
+ * Each code expires after 3 minutes (180 seconds), enforced server-side.
+ * Resend is available after the 30-second backend cooldown.
  */
-export default function OtpStep({ mode, email, maskedEmail, maskedPhone, onSuccess, onBack }) {
+export default function OtpStep({ mode, email, maskedEmail, onSuccess, onBack }) {
   const { verifyLogin, verifyRegistration } = useAuth();
 
   const [emailOtp, setEmailOtp] = useState('');
-  const [phoneOtp, setPhoneOtp] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Countdown until the code expires (starts at 60)
+  // Countdown until the code expires (starts at 180 — 3 minutes)
   const [expiryCountdown, setExpiryCountdown] = useState(CODE_EXPIRY_SECONDS);
 
-  // Cooldown before the user can request a new code (after resend, 30s)
+  // Separate resend cooldown: 30 seconds after a resend (does NOT block resend for the full 3 minutes)
   const [resendCooldown, setResendCooldown] = useState(0);
 
   const codeExpired = expiryCountdown === 0;
@@ -98,30 +98,24 @@ export default function OtpStep({ mode, email, maskedEmail, maskedPhone, onSucce
     return () => clearInterval(timer);
   }, [resendCooldown]);
 
-  const handleResend = useCallback(async (channel) => {
+  const handleResend = useCallback(async () => {
     try {
       if (mode === 'login') {
         await authService.resendLoginOtp(email);
       } else {
-        await authService.resendRegistrationOtp(email, channel);
+        await authService.resendRegistrationOtp(email);
       }
-      toast.success(`New code sent to your ${channel === 'sms' ? 'mobile' : 'email'}.`);
-      // Reset expiry countdown and apply a short resend cooldown
+      toast.success('New code sent to your email.');
+      // Reset expiry countdown and apply the 30-second resend cooldown
       setExpiryCountdown(CODE_EXPIRY_SECONDS);
       setResendCooldown(30);
       setEmailOtp('');
-      if (channel === 'sms') setPhoneOtp('');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Could not resend the code.');
     }
   }, [mode, email]);
 
-  const allFieldsFilled = mode === 'login'
-    ? emailOtp.length === 6
-    : emailOtp.length === 6 && phoneOtp.length === 6;
-
-  // Disable submit if fields aren't filled or the code has expired
-  const canSubmit = allFieldsFilled && !codeExpired;
+  const canSubmit = emailOtp.length === 6 && !codeExpired;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -133,14 +127,12 @@ export default function OtpStep({ mode, email, maskedEmail, maskedPhone, onSucce
         const data = await verifyLogin(email, emailOtp);
         onSuccess?.(data);
       } else {
-        const data = await verifyRegistration({ email, emailOtp, phoneOtp });
+        const data = await verifyRegistration({ email, emailOtp });
         onSuccess?.(data);
       }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Verification failed. Please try again.');
-      // Clear codes so user must re-enter after a failed attempt
       setEmailOtp('');
-      setPhoneOtp('');
     } finally {
       setLoading(false);
     }
@@ -154,12 +146,10 @@ export default function OtpStep({ mode, email, maskedEmail, maskedPhone, onSucce
           <ShieldCheck size={22} />
         </div>
         <h2 className="font-display text-xl font-semibold text-charcoal-700">
-          {mode === 'login' ? 'Confirm it\'s you' : 'Verify your details'}
+          {mode === 'login' ? "Confirm it's you" : 'Verify your email'}
         </h2>
         <p className="text-xs text-charcoal-400">
-          {mode === 'login'
-            ? 'Enter the 6-digit code we emailed you.'
-            : 'Enter the codes sent to your email and mobile number.'}
+          Enter the 6-digit code we emailed you.
         </p>
       </div>
 
@@ -185,24 +175,10 @@ export default function OtpStep({ mode, email, maskedEmail, maskedPhone, onSucce
         label="Email code"
         icon={Mail}
         hint={`Sent to ${maskedEmail || email}`}
-        onResend={() => handleResend('email')}
+        onResend={handleResend}
         resendCooldown={resendCooldown}
         isExpired={codeExpired}
       />
-
-      {/* Mobile Code Input (register mode only) */}
-      {mode === 'register' && (
-        <CodeInput
-          value={phoneOtp}
-          onChange={setPhoneOtp}
-          label="Mobile code"
-          icon={Smartphone}
-          hint={`SMS to ${maskedPhone}`}
-          onResend={() => handleResend('sms')}
-          resendCooldown={resendCooldown}
-          isExpired={codeExpired}
-        />
-      )}
 
       {/* Submit */}
       <Button

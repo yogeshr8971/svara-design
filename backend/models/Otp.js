@@ -3,8 +3,8 @@ import mongoose from 'mongoose';
 // One live OTP per (identifier, purpose). Auto-deleted by the TTL index after expiry.
 const otpSchema = new mongoose.Schema(
   {
-    identifier: { type: String, required: true, index: true }, // lowercase email or E.164 phone
-    channel: { type: String, enum: ['email', 'sms'], required: true },
+    identifier: { type: String, required: true, index: true }, // lowercase email
+    channel: { type: String, enum: ['email'], required: true }, // sms removed
     purpose: { type: String, enum: ['register', 'login', 'password-reset'], required: true },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     codeHash: { type: String, required: true },

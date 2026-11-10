@@ -9,7 +9,8 @@
     "seed": "node seed/seedData.js",
     "migrate:verification": "node scripts/migrateVerification.js",
     "migrate:orders": "node scripts/migrateOrderStatuses.js",
-    "test": "node tests/verifyAllRequirements.js && node tests/productQuery.test.js && node tests/defaultCredits.test.js && node tests/orderFlow.test.js",
+    "migrate:phone-index": "node scripts/migratePhoneIndex.js",
+    "test": "node tests/verifyAllRequirements.js && node tests/productQuery.test.js && node tests/defaultCredits.test.js && node tests/orderFlow.test.js && node tests/authEmailOnly.test.js",
     "vapid": "node -e \"console.log(require('web-push').generateVAPIDKeys())\""
   },
   "dependencies": {

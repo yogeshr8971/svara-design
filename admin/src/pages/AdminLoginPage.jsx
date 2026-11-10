@@ -17,7 +17,8 @@ export default function AdminLoginPage() {
   const [otpStep, setOtpStep] = useState(false);
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
-  const [otpCountdown, setOtpCountdown] = useState(60);
+  const [otpCountdown, setOtpCountdown] = useState(180);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   const from = location.state?.from?.pathname || '/';
 
@@ -27,7 +28,7 @@ export default function AdminLoginPage() {
     }
   }, [isAuthenticated, navigate, from]);
 
-  // Exact 60-second OTP countdown timer (§5)
+  // Exact 3-minute OTP countdown timer
   useEffect(() => {
     let timer;
     if (otpStep && otpCountdown > 0) {
@@ -38,6 +39,17 @@ export default function AdminLoginPage() {
     return () => clearInterval(timer);
   }, [otpStep, otpCountdown]);
 
+  // 30-second resend cooldown timer
+  useEffect(() => {
+    let timer;
+    if (resendCooldown > 0) {
+      timer = setInterval(() => {
+        setResendCooldown((c) => Math.max(0, c - 1));
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
+
   const handleInitialLogin = async (e) => {
     e.preventDefault();
     if (!email || !password) return toast.error('Enter your administrator credentials.');
@@ -47,8 +59,9 @@ export default function AdminLoginPage() {
       const res = await login(email, password);
       if (res?.otpRequired) {
         setOtpStep(true);
-        setOtpCountdown(60);
-        toast.success('Sign-in code sent to your email. Expires in 60 seconds.');
+        setOtpCountdown(180);
+        setResendCooldown(30);
+        toast.success('Sign-in code sent to your email. Expires in 3 minutes.');
       } else if (res?.user?.role === 'admin') {
         toast.success('Welcome back, Administrator.');
         navigate(from, { replace: true });
@@ -88,13 +101,14 @@ export default function AdminLoginPage() {
   };
 
   const handleResendOtp = async () => {
-    if (otpCountdown > 0) return;
+    if (resendCooldown > 0) return;
     try {
       setLoading(true);
       await login(email, password);
-      setOtpCountdown(60);
+      setOtpCountdown(180);
+      setResendCooldown(30);
       setOtp('');
-      toast.success('New 60-second code dispatched to your email.');
+      toast.success('New 3-minute code dispatched to your email.');
     } catch (err) {
       toast.error(err.readableMessage || 'Could not resend verification code.');
     } finally {
@@ -220,11 +234,11 @@ export default function AdminLoginPage() {
                   <button
                     type="button"
                     onClick={handleResendOtp}
-                    disabled={otpCountdown > 0 || loading}
+                    disabled={resendCooldown > 0 || loading}
                     className="text-xs font-semibold text-burgundy-600 hover:text-burgundy-800 disabled:text-charcoal-300 disabled:cursor-not-allowed transition-colors"
                   >
-                    {otpCountdown > 0
-                      ? `Resend available in ${otpCountdown}s`
+                    {resendCooldown > 0
+                      ? `Resend available in ${resendCooldown}s`
                       : 'Request a new code'}
                   </button>
                 </div>

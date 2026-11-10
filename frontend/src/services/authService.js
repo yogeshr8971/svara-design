@@ -11,13 +11,13 @@ const withVerificationPassthrough = async (call) => {
   }
 };
 
-// Registration: step 1 (creates unverified account, sends email + SMS codes)
+// Registration: step 1 (creates unverified account, sends email code)
 export const register = async (payload) => (await api.post('/auth/customer/register', payload)).data;
 export const registerSeller = async (payload) => (await api.post('/auth/seller/register', payload)).data;
-// Registration: step 2 (confirm both codes -> session)
+// Registration: step 2 (confirm email code -> session)
 export const verifyRegistration = async (body) => (await api.post('/auth/register/verify', body)).data;
-export const resendRegistrationOtp = async (email, channel) =>
-  (await api.post('/auth/register/resend', { email, channel })).data;
+export const resendRegistrationOtp = async (email) =>
+  (await api.post('/auth/register/resend', { email })).data;
 
 // Login: step 1 (password -> emails a code)
 export const login = (email, password) =>
@@ -36,7 +36,7 @@ export const logoutAll = async () => (await api.post('/auth/logout-all')).data;
 // Profile
 export const updateProfile = async (profileData) => (await api.put('/auth/profile', profileData)).data;
 
-// Password Reset: step 1 (sends a 3-minute OTP to the account email)
+// Password Reset: step 1 (sends a OTP to the account email; expiry set by OTP_TTL_MS)
 export const forgotPassword = async (email) => (await api.post('/auth/forgot-password', { email })).data;
 // Password Reset: step 2 (OTP + new password)
 export const resetPassword = async (email, otp, newPassword) =>

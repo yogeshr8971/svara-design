@@ -12,7 +12,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [pending, setPending] = useState(null); // { mode, email, maskedEmail, maskedPhone }
+  const [pending, setPending] = useState(null); // { mode, email, maskedEmail }
 
   const { login } = useAuth();
   const navigate = useNavigate();

@@ -19,7 +19,7 @@ export const validateEnv = () => {
   const warn = [];
   if (!process.env.CLIENT_URL) warn.push('CLIENT_URL missing — defaulting to localhost and *.netlify.app / *.vercel.app');
   if (!process.env.SMTP_HOST) warn.push('SMTP_HOST missing — email delivery disabled');
-  if (!process.env.SMS_PROVIDER || process.env.SMS_PROVIDER === 'console') warn.push('SMS_PROVIDER is unset or dev-only (console) — SMS disabled');
+  // SMS_PROVIDER warning removed — SMS verification is no longer used.
   if (!process.env.VAPID_PUBLIC_KEY) warn.push('VAPID keys missing — web push disabled');
   if (!process.env.UPI_VPA) warn.push('UPI_VPA missing — UPI payment option disabled');
   warn.forEach((w) => console.warn('⚠️ ', w));

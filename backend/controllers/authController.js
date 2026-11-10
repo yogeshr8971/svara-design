@@ -6,7 +6,7 @@ import Otp from '../models/Otp.js';
 import CreditBalance from '../models/CreditBalance.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../utils/apiError.js';
-import { normalizePhone, maskEmail, maskPhone } from '../utils/phone.js';
+import { normalizePhone, maskEmail } from '../utils/phone.js';
 import { createSession, clearAuthCookie, signSessionToken } from '../utils/session.js';
 import { issueOtp, verifyOtp } from '../services/otpService.js';
 import { addBonusCredits, getDefaultCreditsForRole, ensureCreditBalance, getBalance } from '../services/creditService.js';
@@ -16,6 +16,7 @@ import { sendPasswordResetConfirmationEmail } from '../services/emailService.js'
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const LOGIN_OTP_ENABLED = () => process.env.LOGIN_EMAIL_OTP !== 'false';
 
+// publicUser omits phoneVerified (removed from schema).
 const publicUser = (user) => ({
   _id: user._id,
   name: user.name,
@@ -31,7 +32,6 @@ const publicUser = (user) => ({
   rejectionReason: user.rejectionReason,
   phone: user.phone,
   emailVerified: user.emailVerified,
-  phoneVerified: user.phoneVerified,
   profileImage: user.profileImage,
   addresses: user.addresses || [],
   createdAt: user.createdAt,
@@ -48,8 +48,8 @@ const normEmail = (e) => String(e || '').toLowerCase().trim();
 
 // ---------------------------------------------------------------------------
 // Registration (customers + sellers share the same verified flow)
-// 1) POST register  -> account created UNVERIFIED, codes sent to email + phone
-// 2) POST register/verify -> both codes confirmed -> session issued
+// 1) POST register  -> account created UNVERIFIED, email code sent
+// 2) POST register/verify -> email code confirmed -> session issued
 // ---------------------------------------------------------------------------
 const beginRegistration = async ({ role, body }) => {
   const { name, password } = body;
@@ -64,14 +64,15 @@ const beginRegistration = async ({ role, body }) => {
   const existingEmail = await User.findOne({ email });
   if (existingEmail?.emailVerified) throw new ApiError(409, 'An account with this email address already exists.', 'EMAIL_EXISTS');
 
-  const phoneOwner = await User.findOne({ phone, phoneVerified: true });
+  // One phone number per verified account (checked via emailVerified now that phoneVerified is gone).
+  const phoneOwner = await User.findOne({ phone, emailVerified: true });
   if (phoneOwner && (!existingEmail || phoneOwner._id.toString() !== existingEmail._id.toString())) {
     throw new ApiError(409, 'This mobile number is already registered.', 'PHONE_EXISTS');
   }
 
   const fields = {
     name: name.trim(), email, phone, role,
-    emailVerified: false, phoneVerified: false,
+    emailVerified: false,
     ...(role === 'seller'
       ? {
           businessName: body.businessName?.trim(), businessAddress: body.businessAddress || '',
@@ -91,25 +92,25 @@ const beginRegistration = async ({ role, body }) => {
   return user;
 };
 
+/** Send only the email verification code (phone/SMS removed). */
 const sendRegistrationCodes = async (user) => {
   await issueOtp({ identifier: user.email, channel: 'email', purpose: 'register', userId: user._id });
-  await issueOtp({ identifier: user.phone, channel: 'sms', purpose: 'register', userId: user._id });
 };
 
-const registrationResponse = (res, user, message) =>
+const registrationResponse = (res, user) =>
   res.status(202).json({
     success: true,
     verificationRequired: true,
     email: user.email,
     maskedEmail: maskEmail(user.email),
-    maskedPhone: maskPhone(user.phone),
-    message,
+    // maskedPhone removed — no phone OTP step
+    message: 'We sent a code to your email.',
   });
 
 export const registerCustomer = asyncHandler(async (req, res) => {
   const user = await beginRegistration({ role: 'user', body: req.body });
   await sendRegistrationCodes(user);
-  registrationResponse(res, user, 'We sent a code to your email and your mobile number.');
+  registrationResponse(res, user);
 });
 
 export const registerSeller = asyncHandler(async (req, res) => {
@@ -128,30 +129,21 @@ export const registerSeller = asyncHandler(async (req, res) => {
     },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
-  registrationResponse(res, user, 'We sent a code to your email and your mobile number.');
+  registrationResponse(res, user);
 });
 
+/** Verify email code only; create session on success. */
 export const verifyRegistration = asyncHandler(async (req, res) => {
   const email = normEmail(req.body.email);
-  const { emailOtp, phoneOtp } = req.body;
-  if (!email || !emailOtp || !phoneOtp) throw new ApiError(400, 'Enter both the email code and the mobile code.', 'VALIDATION_ERROR');
+  const { emailOtp } = req.body;
+  if (!email || !emailOtp) throw new ApiError(400, 'Enter the email verification code.', 'VALIDATION_ERROR');
 
   const user = await User.findOne({ email });
   if (!user || user.emailVerified) throw new ApiError(400, 'Nothing to verify for this email. Please register again.', 'NOT_PENDING');
 
-  // Verify both before consuming either success state, so a typo in one doesn't burn the other.
   await verifyOtp({ identifier: user.email, purpose: 'register', code: emailOtp });
-  try {
-    await verifyOtp({ identifier: user.phone, purpose: 'register', code: phoneOtp });
-  } catch (err) {
-    // Email code was consumed; mark it so the user only needs to fix the phone code.
-    user.emailVerified = true;
-    await user.save();
-    throw err;
-  }
 
   user.emailVerified = true;
-  user.phoneVerified = true;
   await user.save();
 
   await ensureCreditBalance(user._id, user.role);
@@ -162,14 +154,13 @@ export const verifyRegistration = asyncHandler(async (req, res) => {
   await startSession(user, req, res, 201, { message: user.role === 'seller' ? 'Verified. Your seller account is pending admin approval.' : 'Account verified. Welcome to SVARA!' });
 });
 
-/** Partial-verification retry (e.g. only the phone code was wrong). */
+/** Resend the registration email OTP (email channel only; channel param ignored). */
 export const resendRegistrationOtp = asyncHandler(async (req, res) => {
   const email = normEmail(req.body.email);
-  const channel = req.body.channel === 'sms' ? 'sms' : 'email';
   const user = await User.findOne({ email });
-  if (!user || (user.emailVerified && user.phoneVerified)) throw new ApiError(400, 'Nothing to verify for this email.', 'NOT_PENDING');
-  await issueOtp({ identifier: channel === 'email' ? user.email : user.phone, channel, purpose: 'register', userId: user._id });
-  res.json({ success: true, message: `A new code was sent to your ${channel === 'email' ? 'email' : 'mobile'}.` });
+  if (!user || user.emailVerified) throw new ApiError(400, 'Nothing to verify for this email.', 'NOT_PENDING');
+  await issueOtp({ identifier: user.email, channel: 'email', purpose: 'register', userId: user._id });
+  res.json({ success: true, message: 'A new code was sent to your email.' });
 });
 
 // ---------------------------------------------------------------------------
@@ -203,13 +194,15 @@ const beginLogin = (allowedRoles) =>
   asyncHandler(async (req, res) => {
     const user = await checkPassword(req, allowedRoles);
 
-    if (!user.emailVerified || (user.role !== 'admin' && user.phone && !user.phoneVerified && user.createdAt > new Date(process.env.PHONE_VERIFY_AFTER || '2000-01-01'))) {
-      // Unfinished sign-up: resume verification instead of logging in.
+    // Unfinished sign-up: !emailVerified means the account was never confirmed.
+    // Legacy users who have phoneVerified:false (old field) can log in normally —
+    // only the absence of emailVerified blocks them.
+    if (!user.emailVerified) {
       await sendRegistrationCodes(user).catch(() => {});
       return res.status(403).json({
         success: false, code: 'VERIFICATION_REQUIRED', verificationRequired: true,
-        email: user.email, maskedEmail: maskEmail(user.email), maskedPhone: maskPhone(user.phone),
-        message: 'Please finish verifying your email and mobile number. We re-sent your codes.',
+        email: user.email, maskedEmail: maskEmail(user.email),
+        message: 'Please finish verifying your email. We re-sent your code.',
       });
     }
 
@@ -291,10 +284,10 @@ export const updateProfile = asyncHandler(async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// Password Reset Flow (3-Minute Expiry Code)
+// Password Reset Flow
 // ---------------------------------------------------------------------------
 
-/** Request a password reset code. Returns identical response whether email exists or not to prevent user enumeration. */
+/** Request a password reset code. Returns identical response whether email exists or not. */
 export const forgotPassword = asyncHandler(async (req, res) => {
   const email = normEmail(req.body.email);
   if (!email || !EMAIL_RE.test(email)) {
@@ -313,7 +306,7 @@ export const forgotPassword = asyncHandler(async (req, res) => {
   });
 });
 
-/** Verify password reset code and apply new password. Accepts { email, code, password } or { email, otp, newPassword }. Invalidates code immediately upon success. */
+/** Verify password reset code and apply new password. Accepts { email, code, password } or { email, otp, newPassword }. */
 export const resetPassword = asyncHandler(async (req, res) => {
   const email = normEmail(req.body.email);
   const code = String(req.body.code || req.body.otp || '').trim();
@@ -336,10 +329,9 @@ export const resetPassword = asyncHandler(async (req, res) => {
     throw new ApiError(403, 'Account is suspended or blocked. Cannot reset password.', 'ACCOUNT_BLOCKED');
   }
 
-  // Verifies hash, checks 3-minute expiry, deletes code on success (single-use)
+  // Verifies hash, checks expiry, deletes code on success (single-use)
   await verifyOtp({ identifier: user.email, purpose: 'password-reset', code });
 
-  // Update password (pre-save hook will bcrypt hash it)
   user.password = password;
   await user.save();
 
@@ -347,7 +339,6 @@ export const resetPassword = asyncHandler(async (req, res) => {
   await Session.deleteMany({ userId: user._id });
   clearAuthCookie(res);
 
-  // Send confirmation email
   sendPasswordResetConfirmationEmail(user.email, user.name).catch(() => {});
 
   res.status(200).json({
