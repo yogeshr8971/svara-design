@@ -159,6 +159,11 @@ const ProductCard = memo(function ProductCard({ product, footer = null }) {
             </>
           )}
         </div>
+        {product.shippingFee != null && (
+          <p className="text-xs text-charcoal-400 mt-0.5">
+            {product.shippingFee === 0 ? 'Free shipping' : `Shipping ${formatPrice(product.shippingFee)}`}
+          </p>
+        )}
         {footer}
       </div>
     </div>

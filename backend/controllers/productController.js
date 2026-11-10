@@ -173,6 +173,7 @@ export const createProduct = asyncHandler(async (req, res) => {
     data.ownerType = 'seller';
     data.sellerId = req.user._id;
     data.status = 'pending'; // Seller products require admin approval
+    delete data.shippingFee; // Sellers cannot set shipping fee — admin-only
   } else if (req.user.role === 'admin') {
     data.ownerType = 'admin';
     data.sellerId = null;
@@ -269,6 +270,7 @@ export const updateProduct = asyncHandler(async (req, res) => {
     delete data.ownerType;
     delete data.sellerId;
     delete data.status; // Sellers cannot approve their own products
+    delete data.shippingFee; // Sellers cannot set shipping fee — admin-only
   }
 
   // Parse JSON fields

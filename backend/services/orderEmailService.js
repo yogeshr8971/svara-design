@@ -57,9 +57,7 @@ const itemsTableHtml = (items) => {
 
 /** Render the totals block. */
 const totalsHtml = (order) => {
-  // Calculate individual item shipping fees sum if available
-  const itemShippingTotal = order.items.reduce((sum, item) => sum + (item.shippingFee || 0), 0);
-  const shippingDisplay = order.shippingAmount || itemShippingTotal;
+  const shippingDisplay = order.shippingAmount;
 
   const lines = [
     ['Subtotal', inr(order.subtotal)],

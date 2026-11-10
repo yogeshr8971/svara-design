@@ -145,7 +145,7 @@ export default function CartPage() {
           })}
 
           <div className="flex justify-between items-center pt-2">
-            <Link to="/products" className="text-xs text-charcoal-600 hover:text-burgundy-600 font-semibold min-h-[44px] flex items-center">
+            <Link to="/shop" className="text-xs text-charcoal-600 hover:text-burgundy-600 font-semibold min-h-[44px] flex items-center">
               ← Continue Shopping
             </Link>
             <button
@@ -179,12 +179,6 @@ export default function CartPage() {
                 )}
               </span>
             </div>
-
-            {shippingAmount > 0 && cartTotal < (pricing.freeShippingThreshold || 2000) && (
-              <p className="text-[11px] text-champagne-700 bg-champagne-100 p-2.5 rounded-xl font-medium">
-                Add {formatPrice((pricing.freeShippingThreshold || 2000) - cartTotal)} more for free express delivery.
-              </p>
-            )}
 
             <div className="border-t border-ivory-300/40 pt-3 flex justify-between text-base font-bold text-charcoal-900">
               <span>Verified Total</span>

@@ -147,6 +147,11 @@ export default function ProductDetailPage() {
               )}
             </div>
           </div>
+          {product.shippingFee != null && (
+            <p className="text-xs text-charcoal-400 mt-1">
+              {product.shippingFee === 0 ? 'Free shipping' : `Shipping ${formatPrice(product.shippingFee)}`}
+            </p>
+          )}
 
           {/* Inventory Alerts */}
           <div className="mt-1">

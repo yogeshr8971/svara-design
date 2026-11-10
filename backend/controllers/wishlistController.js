@@ -4,7 +4,7 @@ import { ApiError } from '../utils/apiError.js';
 
 export const getWishlist = asyncHandler(async (req, res) => {
   const wishlist = await Wishlist.findOne({ userId: req.user._id }).populate(
-    'products', 'name slug price compareAtPrice images trending featured'
+    'products', 'name slug price compareAtPrice images trending featured shippingFee'
   );
   res.json({ success: true, wishlist: wishlist || { products: [] } });
 });

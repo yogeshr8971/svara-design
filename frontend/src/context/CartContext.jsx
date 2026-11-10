@@ -12,32 +12,36 @@ export function CartProvider({ children }) {
     subtotal: 0,
     shippingAmount: 0,
     totalAmount: 0,
-    freeShippingThreshold: 2000,
   });
   const [loading, setLoading] = useState(false);
 
-  const applyCartData = (cartData) => {
-    if (!cartData) return;
-    const items = cartData.items || [];
+  const applyCartData = (data) => {
+    if (!data) return;
+    const items = data.cart?.items || [];
     setCartItems(items);
-    setPricing({
-      subtotal: cartData.subtotal ?? items.reduce((acc, i) => acc + (i.price || 0) * (i.quantity || 1), 0),
-      shippingAmount: cartData.shippingAmount ?? 0,
-      totalAmount: cartData.totalAmount ?? items.reduce((acc, i) => acc + (i.price || 0) * (i.quantity || 1), 0),
-      freeShippingThreshold: cartData.freeShippingThreshold ?? 2000,
-    });
+    if (data.pricing) {
+      setPricing({
+        subtotal: data.pricing.subtotal ?? 0,
+        shippingAmount: data.pricing.shippingAmount ?? 0,
+        totalAmount: data.pricing.totalAmount ?? 0,
+      });
+    } else {
+      // Local fallback: shipping 0
+      const localSubtotal = items.reduce((acc, i) => acc + (i.price || 0) * (i.quantity || 1), 0);
+      setPricing({ subtotal: localSubtotal, shippingAmount: 0, totalAmount: localSubtotal });
+    }
   };
 
   const fetchCart = useCallback(async () => {
     if (!user) {
       setCartItems([]);
-      setPricing({ subtotal: 0, shippingAmount: 0, totalAmount: 0, freeShippingThreshold: 2000 });
+      setPricing({ subtotal: 0, shippingAmount: 0, totalAmount: 0 });
       return;
     }
     try {
       setLoading(true);
       const data = await cartService.getCart();
-      applyCartData(data.cart);
+      applyCartData(data);
     } catch {
     } finally {
       setLoading(false);
@@ -51,7 +55,7 @@ export function CartProvider({ children }) {
   const addToCart = async (productId, size, color, quantity = 1) => {
     try {
       const data = await cartService.addToCart({ productId, size, color, quantity });
-      applyCartData(data.cart);
+      applyCartData(data);
       toast.success('Added to cart');
       return data;
     } catch (e) {
@@ -63,7 +67,7 @@ export function CartProvider({ children }) {
   const updateQuantity = async (itemId, quantity) => {
     try {
       const data = await cartService.updateItem(itemId, quantity);
-      applyCartData(data.cart);
+      applyCartData(data);
     } catch (e) {
       toast.error(e.response?.data?.message || 'Failed to update cart');
     }
@@ -72,7 +76,7 @@ export function CartProvider({ children }) {
   const removeFromCart = async (itemId) => {
     try {
       const data = await cartService.removeItem(itemId);
-      applyCartData(data.cart);
+      applyCartData(data);
       toast.success('Removed from cart');
     } catch {
       toast.error('Failed to remove item');
@@ -83,7 +87,7 @@ export function CartProvider({ children }) {
     try {
       await cartService.clearCart();
       setCartItems([]);
-      setPricing({ subtotal: 0, shippingAmount: 0, totalAmount: 0, freeShippingThreshold: 2000 });
+      setPricing({ subtotal: 0, shippingAmount: 0, totalAmount: 0 });
     } catch {}
   };
 

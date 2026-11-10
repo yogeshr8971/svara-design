@@ -16,11 +16,8 @@ export default function CheckoutPage() {
   const navigate = useNavigate();
 
   // Authoritative server-calculated shipping fee and final total
-  const shipping = shippingAmount ?? cartItems.reduce((sum, item) => {
-    const fee = item.productId?.shippingFee ?? item.shippingFee;
-    return sum + (fee !== undefined && fee !== null ? Number(fee) * item.quantity : 0);
-  }, 0);
-  const totalAmount = serverTotal ?? (cartTotal + shipping);
+  const shipping = shippingAmount;
+  const totalAmount = serverTotal;
 
   const codBlocked = totalAmount > COD_MAX;
   const METHODS = [

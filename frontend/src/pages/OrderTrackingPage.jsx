@@ -169,8 +169,8 @@ export default function OrderTrackingPage() {
                   {i > 0 && (
                     <span className={`absolute top-4 right-1/2 w-full h-0.5 -z-0 ${current >= i ? 'bg-champagne-500' : 'bg-ivory-300'}`} />
                   )}
-                  <span className={`relative z-10 w-8 h-8 rounded-full grid place-items-center ${done ? 'bg-champagne-600 text-white' : 'bg-ivory-300 text-charcoal-400'}`}>
-                    {done ? <Check size={16} /> : <Circle size={10} />}
+                  <span className={`relative z-10 w-8 h-8 rounded-full grid place-items-center ${done ? 'bg-champagne-500 text-white' : 'bg-ivory-300 text-charcoal-400'}`}>
+                    {done ? <Check size={16} strokeWidth={3} /> : <Circle size={10} />}
                   </span>
                   <span className={`text-[11px] font-semibold ${done ? 'text-charcoal-700' : 'text-charcoal-300'}`}>{s.label}</span>
                   {timestamp && (
@@ -229,7 +229,7 @@ export default function OrderTrackingPage() {
             <ol className="space-y-4 border-l-2 border-ivory-300 ml-1.5">
               {[...(order.statusHistory || [])].reverse().map((h, i) => (
                 <li key={h._id || i} className="pl-4 relative">
-                  <span className={`absolute -left-[7px] top-1 w-3 h-3 rounded-full ${i === 0 ? 'bg-champagne-600' : 'bg-ivory-400'}`} />
+                  <span className={`absolute -left-[7px] top-1 w-3 h-3 rounded-full ${i === 0 ? 'bg-champagne-500' : 'bg-charcoal-200'}`} />
                   <p className="text-xs font-semibold text-charcoal-700 capitalize">{(ORDER_STATUSES[h.status]?.label || h.status).toString()}</p>
                   {h.note && <p className="text-[11px] text-charcoal-500">{h.note}</p>}
                   <p className="text-[10px] text-charcoal-300">{formatDate(h.at)}</p>

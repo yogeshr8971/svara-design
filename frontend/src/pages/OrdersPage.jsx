@@ -177,7 +177,7 @@ export default function OrdersPage() {
                     className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 min-h-[40px] rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-sm ${
                       isPendingUpi
                         ? 'bg-amber-600 text-white hover:bg-amber-700 border border-amber-600'
-                        : 'bg-charcoal-900 text-white hover:bg-charcoal-800 border border-charcoal-900'
+                        : 'bg-charcoal-800 text-white hover:bg-charcoal-700 border border-charcoal-800'
                     }`}
                   >
                     <Truck size={16} />

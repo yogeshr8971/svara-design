@@ -1,42 +1,43 @@
 import Cart from '../models/Cart.js';
 import Product from '../models/Product.js';
-import PlatformSettings from '../models/PlatformSettings.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../utils/apiError.js';
+import { calcShipping } from '../utils/shipping.js';
 
-export const getCart = asyncHandler(async (req, res) => {
-  const cart = await Cart.findOne({ userId: req.user._id }).populate(
+// ---------------------------------------------------------------------------
+// Shared helper — builds the full cart payload (server-authoritative pricing)
+// ---------------------------------------------------------------------------
+const buildCartPayload = async (userId) => {
+  const cart = await Cart.findOne({ userId }).populate(
     'items.productId',
     'name images price stock shippingFee isActive status'
   );
 
   const items = cart?.items || [];
-  const settings = await PlatformSettings.getSettings();
-  const freeThreshold = settings.freeShippingThreshold ?? 2000;
 
   const subtotal = items.reduce((sum, item) => {
     const currentPrice = item.productId?.price ?? item.price;
     return sum + currentPrice * item.quantity;
   }, 0);
 
-  const itemShippingSum = items.reduce((sum, item) => {
-    const fee = item.productId?.shippingFee ?? 0;
-    return sum + fee * item.quantity;
-  }, 0);
+  // Map items so calcShipping can read shippingFee from the populated product
+  const shippingItems = items.map((item) => ({
+    shippingFee: item.productId?.shippingFee ?? 0,
+    quantity: item.quantity,
+  }));
 
-  const shippingAmount = subtotal >= freeThreshold || items.length === 0 ? 0 : itemShippingSum;
+  const shippingAmount = calcShipping(shippingItems);
   const totalAmount = subtotal + shippingAmount;
 
-  res.json({
-    success: true,
-    cart: cart || { userId: req.user._id, items: [] },
-    pricing: {
-      subtotal,
-      shippingAmount,
-      totalAmount,
-      freeShippingThreshold: freeThreshold,
-    },
-  });
+  return {
+    cart: cart || { userId, items: [] },
+    pricing: { subtotal, shippingAmount, totalAmount },
+  };
+};
+
+export const getCart = asyncHandler(async (req, res) => {
+  const { cart, pricing } = await buildCartPayload(req.user._id);
+  res.json({ success: true, cart, pricing });
 });
 
 export const addToCart = asyncHandler(async (req, res) => {
@@ -86,7 +87,9 @@ export const addToCart = asyncHandler(async (req, res) => {
   }
   cart.updatedAt = new Date();
   await cart.save();
-  res.json({ success: true, cart });
+
+  const { cart: updatedCart, pricing } = await buildCartPayload(req.user._id);
+  res.json({ success: true, cart: updatedCart, pricing });
 });
 
 export const updateCartItem = asyncHandler(async (req, res) => {
@@ -111,7 +114,9 @@ export const updateCartItem = asyncHandler(async (req, res) => {
   item.quantity = requestedQuantity;
   cart.updatedAt = new Date();
   await cart.save();
-  res.json({ success: true, cart });
+
+  const { cart: updatedCart, pricing } = await buildCartPayload(req.user._id);
+  res.json({ success: true, cart: updatedCart, pricing });
 });
 
 export const removeCartItem = asyncHandler(async (req, res) => {
@@ -121,7 +126,9 @@ export const removeCartItem = asyncHandler(async (req, res) => {
   cart.items = cart.items.filter((i) => i._id.toString() !== req.params.itemId);
   cart.updatedAt = new Date();
   await cart.save();
-  res.json({ success: true, cart });
+
+  const { cart: updatedCart, pricing } = await buildCartPayload(req.user._id);
+  res.json({ success: true, cart: updatedCart, pricing });
 });
 
 export const clearCart = asyncHandler(async (req, res) => {

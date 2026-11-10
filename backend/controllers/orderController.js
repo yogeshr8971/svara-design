@@ -8,6 +8,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../utils/apiError.js';
 import { createRazorpayOrder, verifyPaymentSignature } from '../services/paymentService.js';
 import { normalizePhone } from '../utils/phone.js';
+import { calcShipping } from '../utils/shipping.js';
 import { notifyAdmins } from '../services/notificationService.js';
 import { pushHistory, notifyCustomer, notifySellersOfNewOrder } from '../services/orderEvents.js';
 import { sendOrderConfirmedEmail } from '../services/orderEmailService.js';
@@ -15,12 +16,6 @@ import { sendOrderConfirmedEmail } from '../services/orderEmailService.js';
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/** Shipping config from env or sensible defaults */
-const getShippingConfig = () => ({
-  freeThreshold: Number(process.env.FREE_SHIPPING_THRESHOLD) || 2000,
-  flatRate: Number(process.env.SHIPPING_COST) || 99,
-});
 
 /**
  * Atomically decrement stock for every order item.
@@ -270,14 +265,11 @@ export const createOrder = asyncHandler(async (req, res) => {
   });
 
   // --- 4. Calculate totals using server-authoritative settings ---
-  const freeThreshold = settings.freeShippingThreshold ?? (Number(process.env.FREE_SHIPPING_THRESHOLD) || 2000);
   const subtotal = orderItems.reduce(
     (acc, item) => acc + item.price * item.quantity,
     0
   );
-  // Sum of product-specific shipping fees assigned by administration
-  const itemShippingSum = orderItems.reduce((acc, item) => acc + (item.shippingFee || 0), 0);
-  const shippingAmount = subtotal >= freeThreshold ? 0 : itemShippingSum;
+  const shippingAmount = calcShipping(orderItems);
   const totalAmount = subtotal + shippingAmount;
 
   const codMax = Number(process.env.COD_MAX_AMOUNT) || 10000;
