@@ -31,11 +31,10 @@ mongoose.connect(MONGO_URI).then(async () => {
     console.log(`  name=${idx.name}  key=${JSON.stringify(idx.key)}  unique=${!!idx.unique}`);
   });
 
-  // Find any index that is unique AND whose key is exactly { userId: 1 }
+  // Find any index that is unique AND whose key is { userId: 1 } (or stale compound like { userId: 1, checkoutIdempotencyKey: 1 })
   const targets = indexes.filter((idx) => {
     if (!idx.unique) return false;
-    const keys = Object.keys(idx.key);
-    return keys.length === 1 && keys[0] === 'userId' && idx.key.userId === 1;
+    return idx.key.userId === 1;
   });
 
   if (targets.length === 0) {

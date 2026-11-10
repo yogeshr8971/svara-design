@@ -150,7 +150,7 @@ const validateAddress = (a) => {
 
 /** Release stock held by this user's earlier unpaid checkouts so abandoned attempts don't lock inventory. */
 const cancelStalePending = async (userId) => {
-  const stale = await Order.find({ userId, orderStatus: 'pending_payment' });
+  const stale = await Order.find({ userId, orderStatus: 'pending_payment', paymentStatus: { $ne: 'paid' }, 'upi.submittedAt': null });
   for (const o of stale) {
     if (o.isInventoryDeducted) { await restoreInventory(o.items); o.isInventoryDeducted = false; }
     o.orderStatus = 'cancelled'; o.paymentStatus = o.paymentStatus === 'paid' ? o.paymentStatus : 'failed';
@@ -316,9 +316,10 @@ export const createOrder = asyncHandler(async (req, res) => {
 
   // --- 6. Create Razorpay order ---
   const receipt = `order_${req.user._id}_${Date.now()}`;
+  const amountInPaise = Math.round(totalAmount * 100);
   let rzOrder;
   try {
-    rzOrder = await createRazorpayOrder(totalAmount * 100, receipt);
+    rzOrder = await createRazorpayOrder(amountInPaise, receipt);
   } catch (err) {
     // Restore stock if Razorpay call fails
     await restoreInventory(orderItems);
@@ -330,25 +331,28 @@ export const createOrder = asyncHandler(async (req, res) => {
   }
 
   // --- 7. Persist order ---
-  const order = await Order.create({
-    userId: req.user._id,
-    items: orderItems,
-    shippingAddress,
-    subtotal,
-    shippingAmount,
-    totalAmount,
-    razorpayOrderId: rzOrder.id,
-    paymentMethod: 'razorpay',
-    orderStatus: 'pending_payment',
-    isInventoryDeducted: true,
-    statusHistory: [{ status: 'pending_payment', note: 'Awaiting online payment', at: new Date() }],
-  });
+  let order;
+  try {
+    order = await Order.create({
+      userId: req.user._id,
+      items: orderItems,
+      shippingAddress,
+      subtotal,
+      shippingAmount,
+      totalAmount,
+      razorpayOrderId: rzOrder.id,
+      paymentMethod: 'razorpay',
+      orderStatus: 'pending_payment',
+      isInventoryDeducted: true,
+      statusHistory: [{ status: 'pending_payment', note: 'Awaiting online payment', at: new Date() }],
+    });
+  } catch (err) { await restoreInventory(orderItems); throw err; }
 
   res.status(201).json({
     success: true,
     order,
     razorpayOrderId: rzOrder.id,
-    amountInPaise: totalAmount * 100,
+    amountInPaise,
     keyId: process.env.RAZORPAY_KEY_ID,
   });
 });
