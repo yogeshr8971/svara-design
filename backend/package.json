@@ -11,6 +11,7 @@
     "migrate:orders": "node scripts/migrateOrderStatuses.js",
     "migrate:phone-index": "node scripts/migratePhoneIndex.js",
     "migrate:order-index": "node scripts/migrateOrderUserIndex.js",
+    "reset:reviews": "node scripts/resetReviewData.js",
     "test": "node tests/verifyAllRequirements.js && node tests/productQuery.test.js && node tests/defaultCredits.test.js && node tests/orderFlow.test.js && node tests/authEmailOnly.test.js",
     "vapid": "node -e \"console.log(require('web-push').generateVAPIDKeys())\""
   },

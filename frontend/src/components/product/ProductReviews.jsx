@@ -7,6 +7,12 @@ import { useAuth } from '../../context/AuthContext';
 import { formatDate } from '../../utils/formatDate';
 import toast from 'react-hot-toast';
 
+const MAX_WORDS = 30;
+const limitWords = (v) => {
+  const w = v.trim().split(/\s+/).filter(Boolean);
+  return w.length <= MAX_WORDS ? v : w.slice(0, MAX_WORDS).join(' ');
+};
+
 export default function ProductReviews({ productId }) {
   const { user } = useAuth();
 
@@ -23,6 +29,8 @@ export default function ProductReviews({ productId }) {
   const [title, setTitle] = useState('');
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const wordCount = (comment || '').trim().split(/\s+/).filter(Boolean).length;
 
   const fetchReviews = async () => {
     try {
@@ -53,6 +61,7 @@ export default function ProductReviews({ productId }) {
     e.preventDefault();
     if (!rating) return toast.error('Please select a star rating.');
     if (!comment.trim()) return toast.error('Please share your thoughts in the review comment.');
+    if (wordCount > 30) return toast.error('Review must be 30 words or fewer.');
 
     try {
       setSubmitting(true);
@@ -238,17 +247,20 @@ export default function ProductReviews({ productId }) {
                 rows={4}
                 placeholder="Describe fit, fabric quality, styling versatility..."
                 value={comment}
-                onChange={(e) => setComment(e.target.value)}
+                onChange={(e) => setComment(limitWords(e.target.value))}
                 className="input-field py-2 text-xs w-full"
                 required
               />
+              <div className="text-[11px] text-charcoal-400 text-right mt-1">
+                {wordCount}/30 words
+              </div>
             </div>
 
             <div className="flex justify-end gap-3 pt-2">
               <Button variant="outline" size="sm" onClick={() => setShowForm(false)}>
                 Cancel
               </Button>
-              <Button variant="primary" size="sm" loading={submitting}>
+              <Button type="submit" variant="primary" size="sm" loading={submitting}>
                 Submit Review
               </Button>
             </div>

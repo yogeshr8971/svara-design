@@ -158,7 +158,6 @@ const productData = products.map((p, i) => ({
   ...p,
   slug: `${slugify(p.name)}-${i + 1}`,
   brand: 'SVARA',
-  ratings: { average: 4 + Math.random() * 0.9, count: Math.floor(Math.random() * 200) + 10 },
 }));
 
 await Product.insertMany(productData);

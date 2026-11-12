@@ -7,6 +7,15 @@ import { ApiError } from '../utils/apiError.js';
 import { uploadToCloudinary } from '../services/cloudinaryService.js';
 import { validateFileType } from '../utils/validateFileType.js';
 
+const MAX_REVIEW_WORDS = 30;
+const countWords = (s) => String(s || '').trim().split(/\s+/).filter(Boolean).length;
+const findDeliveredPurchase = (userId, productId) =>
+  Order.findOne({
+    userId,
+    items: { $elemMatch: { productId, fulfillmentStatus: 'Delivered' } },
+    $or: [{ paymentStatus: 'paid' }, { paymentMethod: 'cod' }],
+  });
+
 // Helper to recalculate and persist averageRating, count, and distribution on Product
 export const updateProductRatingStats = async (productId) => {
   const stats = await Review.aggregate([
@@ -104,12 +113,7 @@ export const getProductReviews = asyncHandler(async (req, res) => {
 
   if (req.user) {
     userReview = await Review.findOne({ productId, userId: req.user._id });
-    const deliveredOrder = await Order.findOne({
-      userId: req.user._id,
-      paymentStatus: 'paid',
-      orderStatus: 'delivered',
-      'items.productId': productId,
-    });
+    const deliveredOrder = await findDeliveredPurchase(req.user._id, productId);
     if (deliveredOrder) {
       isVerified = true;
       canReview = req.user.role === 'user' && !userReview;
@@ -142,11 +146,14 @@ export const createReview = asyncHandler(async (req, res) => {
     throw new ApiError(403, 'Only customer accounts can submit product reviews.', 'CUSTOMER_ONLY');
   }
 
-  if (!rating || Number(rating) < 1 || Number(rating) > 5) {
+  if (!Number.isInteger(Number(rating)) || Number(rating) < 1 || Number(rating) > 5) {
     throw new ApiError(400, 'Rating must be an integer between 1 and 5.', 'VALIDATION_ERROR');
   }
   if (!comment || !comment.trim()) {
     throw new ApiError(400, 'Review comment is required.', 'VALIDATION_ERROR');
+  }
+  if (countWords(comment) > MAX_REVIEW_WORDS) {
+    throw new ApiError(400, `Review must be ${MAX_REVIEW_WORDS} words or fewer.`, 'VALIDATION_ERROR');
   }
 
   const product = await Product.findById(productId);
@@ -159,12 +166,7 @@ export const createReview = asyncHandler(async (req, res) => {
   }
 
   // Check verified purchase (Rule 39)
-  const deliveredOrder = await Order.findOne({
-    userId: req.user._id,
-    paymentStatus: 'paid',
-    orderStatus: 'delivered',
-    'items.productId': productId,
-  });
+  const deliveredOrder = await findDeliveredPurchase(req.user._id, productId);
   if (!deliveredOrder) {
     throw new ApiError(403, 'You can review this product after it has been delivered.', 'DELIVERED_PURCHASE_REQUIRED');
   }
@@ -218,12 +220,21 @@ export const updateReview = asyncHandler(async (req, res) => {
 
   const { rating, title, comment } = req.body;
   if (rating !== undefined) {
-    const num = Number(rating);
-    if (num < 1 || num > 5) throw new ApiError(400, 'Rating must be between 1 and 5.');
-    review.rating = num;
+    if (!Number.isInteger(Number(rating)) || Number(rating) < 1 || Number(rating) > 5) {
+      throw new ApiError(400, 'Rating must be an integer between 1 and 5.', 'VALIDATION_ERROR');
+    }
+    review.rating = Number(rating);
   }
   if (title !== undefined) review.title = title.trim();
-  if (comment !== undefined) review.comment = comment.trim();
+  if (comment !== undefined) {
+    if (!comment || !comment.trim()) {
+      throw new ApiError(400, 'Review comment is required.', 'VALIDATION_ERROR');
+    }
+    if (countWords(comment) > MAX_REVIEW_WORDS) {
+      throw new ApiError(400, `Review must be ${MAX_REVIEW_WORDS} words or fewer.`, 'VALIDATION_ERROR');
+    }
+    review.comment = comment.trim();
+  }
   review.isEdited = true;
   await review.save();
 
