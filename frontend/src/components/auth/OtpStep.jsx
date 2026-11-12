@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 
 // Must match backend OTP_TTL_MS = Math.max(3, OTP_TTL_MINUTES || 3) * 60 * 1000 (≥ 3 minutes = 180 seconds)
 const CODE_EXPIRY_SECONDS = 180;
+const RESEND_COOLDOWN_SECONDS = 180;
 
 /**
  * Formats remaining seconds as MM:SS string, e.g. 125 → "02:05"
@@ -50,7 +51,7 @@ function CodeInput({ value, onChange, label, icon: Icon, hint, onResend, resendC
           onClick={onResend}
           className="font-semibold text-champagne-600 disabled:text-charcoal-300"
         >
-          {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
+          {resendCooldown > 0 ? `Resend in ${formatCountdown(resendCooldown)}` : 'Resend code'}
         </button>
       </div>
     </div>
@@ -64,7 +65,7 @@ function CodeInput({ value, onChange, label, icon: Icon, hint, onResend, resendC
  * mode 'register' → one email code (phone/SMS step removed)
  *
  * Each code expires after 3 minutes (180 seconds), enforced server-side.
- * Resend is available after the 30-second backend cooldown.
+ * Resend is available after the 3-minute backend cooldown.
  */
 export default function OtpStep({ mode, email, maskedEmail, onSuccess, onBack }) {
   const { verifyLogin, verifyRegistration } = useAuth();
@@ -75,8 +76,8 @@ export default function OtpStep({ mode, email, maskedEmail, onSuccess, onBack })
   // Countdown until the code expires (starts at 180 — 3 minutes)
   const [expiryCountdown, setExpiryCountdown] = useState(CODE_EXPIRY_SECONDS);
 
-  // Separate resend cooldown: 30 seconds after a resend (does NOT block resend for the full 3 minutes)
-  const [resendCooldown, setResendCooldown] = useState(0);
+  // Resend cooldown: 3 minutes after send/resend
+  const [resendCooldown, setResendCooldown] = useState(RESEND_COOLDOWN_SECONDS);
 
   const codeExpired = expiryCountdown === 0;
 
@@ -106,9 +107,9 @@ export default function OtpStep({ mode, email, maskedEmail, onSuccess, onBack })
         await authService.resendRegistrationOtp(email);
       }
       toast.success('New code sent to your email.');
-      // Reset expiry countdown and apply the 30-second resend cooldown
+      // Reset expiry countdown and apply the 3-minute resend cooldown
       setExpiryCountdown(CODE_EXPIRY_SECONDS);
-      setResendCooldown(30);
+      setResendCooldown(RESEND_COOLDOWN_SECONDS);
       setEmailOtp('');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Could not resend the code.');

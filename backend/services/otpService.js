@@ -5,8 +5,8 @@ import { sendOtpEmail } from './emailService.js';
 
 // TTL: at least 3 minutes, overridable via OTP_TTL_MINUTES env (never below 3).
 export const OTP_TTL_MS = Math.max(3, Number(process.env.OTP_TTL_MINUTES) || 3) * 60 * 1000;
-/** Minimum wait between resend requests (unchanged). */
-const RESEND_COOLDOWN_MS = 30 * 1000;
+/** Minimum wait between resend requests (3 minutes = 180 seconds). */
+const RESEND_COOLDOWN_MS = 3 * 60 * 1000;
 /** Maximum incorrect attempts before the code is invalidated (unchanged). */
 const MAX_ATTEMPTS = 5;
 

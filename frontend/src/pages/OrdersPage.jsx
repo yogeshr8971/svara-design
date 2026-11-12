@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Package, ArrowRight, ExternalLink, MapPin, Truck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Spinner from '../components/ui/Spinner';
+import Skeleton from '../components/ui/Skeleton';
 import Button from '../components/ui/Button';
 import { formatDate } from '../utils/formatDate';
 import { formatPrice } from '../utils/formatPrice';
@@ -23,21 +24,74 @@ const resolveStatus = (raw) => {
 export default function OrdersPage() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const sentinelRef = useRef(null);
+  const isFetchingRef = useRef(false);
 
   useEffect(() => {
+    let isMounted = true;
     const fetchOrders = async () => {
       try {
         setLoading(true);
-        const res = await orderService.getOrders();
-        setOrders(res.orders || []);
+        const res = await orderService.getOrders({ page: 1, limit: 10 });
+        if (isMounted) {
+          setOrders(res.orders || []);
+          setHasMore(Boolean(res.hasMore));
+          setPage(1);
+        }
       } catch (err) {
         console.error('Error fetching orders:', err);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
     fetchOrders();
+    return () => {
+      isMounted = false;
+    };
   }, []);
+
+  const loadNextPage = useCallback(async () => {
+    if (isFetchingRef.current || !hasMore || loading || loadingMore) return;
+    isFetchingRef.current = true;
+    setLoadingMore(true);
+    const nextPage = page + 1;
+    try {
+      const res = await orderService.getOrders({ page: nextPage, limit: 10 });
+      setOrders((prev) => {
+        const existingIds = new Set(prev.map((o) => o._id));
+        const newOrders = (res.orders || []).filter((o) => !existingIds.has(o._id));
+        return [...prev, ...newOrders];
+      });
+      setHasMore(Boolean(res.hasMore));
+      setPage(nextPage);
+    } catch (err) {
+      console.error('Error fetching next page of orders:', err);
+    } finally {
+      setLoadingMore(false);
+      isFetchingRef.current = false;
+    }
+  }, [hasMore, loading, loadingMore, page]);
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loading && !loadingMore) {
+          loadNextPage();
+        }
+      },
+      { rootMargin: '300px' }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [loadNextPage, hasMore, loading, loadingMore]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -48,8 +102,26 @@ export default function OrdersPage() {
       </div>
 
       {loading ? (
-        <div className="min-h-[50vh] flex flex-col items-center justify-center">
-          <Spinner size="lg" />
+        <div className="space-y-6">
+          {[1, 2, 3].map((n) => (
+            <div key={n} className="glass rounded-3xl p-6 sm:p-8 space-y-6 border border-white/60 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-ivory-300/40 pb-4">
+                <div className="space-y-2">
+                  <Skeleton className="h-5 w-40" />
+                  <Skeleton className="h-3 w-56" />
+                </div>
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-6 w-24 rounded-full" />
+                  <Skeleton className="h-6 w-20" />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                <Skeleton className="h-20 w-full rounded-2xl" />
+                <Skeleton className="h-20 w-full rounded-2xl" />
+                <Skeleton className="h-20 w-full rounded-2xl" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : orders.length === 0 ? (
         <div className="glass rounded-3xl p-16 text-center max-w-md mx-auto space-y-4">
@@ -118,6 +190,10 @@ export default function OrdersPage() {
                         <img
                           src={item.image || 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=200'}
                           alt={item.name}
+                          loading="lazy"
+                          decoding="async"
+                          width={64}
+                          height={80}
                           className="w-16 h-20 object-cover rounded-xl bg-ivory-200 flex-shrink-0"
                         />
                         <div className="text-xs space-y-1 min-w-0 flex-1">
@@ -187,6 +263,13 @@ export default function OrdersPage() {
               </div>
             );
           })}
+
+          <div ref={sentinelRef} />
+          {loadingMore && (
+            <div className="flex justify-center py-4">
+              <Spinner size="sm" />
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -609,6 +609,27 @@ export const getUpiDetails = asyncHandler(async (req, res) => {
 // Get Orders (current user)
 // ---------------------------------------------------------------------------
 export const getOrders = asyncHandler(async (req, res) => {
+  if (req.query.page !== undefined || req.query.limit !== undefined) {
+    const page = Math.max(1, +req.query.page || 1);
+    const limit = Math.min(20, Math.max(1, +req.query.limit || 10));
+    const [orders, total] = await Promise.all([
+      Order.find({ userId: req.user._id })
+        .populate('items.productId', 'name slug images')
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit),
+      Order.countDocuments({ userId: req.user._id }),
+    ]);
+    return res.json({
+      success: true,
+      orders,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+      hasMore: page * limit < total,
+    });
+  }
+
   const orders = await Order.find({ userId: req.user._id })
     .populate('items.productId', 'name slug images')
     .sort({ createdAt: -1 });

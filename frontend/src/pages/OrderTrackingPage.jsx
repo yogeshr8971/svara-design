@@ -1,14 +1,16 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, lazy, Suspense } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, Circle, Copy, MapPin, Package, Truck, CreditCard } from 'lucide-react';
 import Spinner from '../components/ui/Spinner';
+import Skeleton from '../components/ui/Skeleton';
 import Button from '../components/ui/Button';
-import UpiPaymentPanel from '../components/checkout/UpiPaymentPanel';
 import { formatDate } from '../utils/formatDate';
 import { formatPrice } from '../utils/formatPrice';
 import { ORDER_STATUSES, PAYMENT_STATUSES, PAYMENT_METHOD_LABELS } from '../utils/constants';
 import * as orderService from '../services/orderService';
 import toast from 'react-hot-toast';
+
+const UpiPaymentPanel = lazy(() => import('../components/checkout/UpiPaymentPanel'));
 
 const STEPS = [
   { key: 'Ordered', label: 'Ordered' },
@@ -50,14 +52,15 @@ export default function OrderTrackingPage() {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (isPolling = false) => {
     try {
+      if (!isPolling) setLoading(true);
       const res = await orderService.getOrder(id);
       setOrder(res.order);
     } catch {
-      toast.error('Order not found.');
+      if (!isPolling) toast.error('Order not found.');
     } finally {
-      setLoading(false);
+      if (!isPolling) setLoading(false);
     }
   }, [id]);
 
@@ -75,12 +78,12 @@ export default function OrderTrackingPage() {
 
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible') {
-        load();
+        load(true);
       }
     }, 10000);
 
     const handleFocus = () => {
-      load();
+      load(true);
     };
 
     window.addEventListener('focus', handleFocus);
@@ -91,7 +94,64 @@ export default function OrderTrackingPage() {
     };
   }, [order?.orderStatus, load]);
 
-  if (loading) return <div className="min-h-[60vh] grid place-items-center"><Spinner size="lg" /></div>;
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-6 min-h-[70vh]">
+        {/* Back-link bar */}
+        <Skeleton className="h-4 w-24" />
+
+        {/* Title bar */}
+        <div className="glass rounded-3xl p-6 sm:p-8 flex flex-wrap items-start justify-between gap-4">
+          <div className="space-y-2">
+            <Skeleton className="h-3 w-28" />
+            <Skeleton className="h-7 w-40" />
+            <Skeleton className="h-3 w-52" />
+          </div>
+          <div className="flex flex-col items-end gap-2">
+            <Skeleton className="h-6 w-24 rounded-full" />
+            <Skeleton className="h-5 w-28 rounded-full" />
+          </div>
+        </div>
+
+        {/* 3-step row */}
+        <div className="glass rounded-3xl p-6 sm:p-8">
+          <div className="grid grid-cols-3 gap-2">
+            {[1, 2, 3].map((step) => (
+              <div key={step} className="flex flex-col items-center gap-2">
+                <Skeleton className="w-8 h-8 rounded-full" />
+                <Skeleton className="h-3 w-16" />
+                <Skeleton className="h-2.5 w-20" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* One items card */}
+        <div className="glass rounded-3xl p-6 space-y-4">
+          <Skeleton className="h-5 w-24" />
+          <div className="flex gap-3">
+            <Skeleton className="w-14 h-[72px] rounded-xl flex-shrink-0" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-3 w-1/2" />
+              <Skeleton className="h-3 w-1/4" />
+            </div>
+            <Skeleton className="h-5 w-16" />
+          </div>
+          <div className="border-t border-ivory-300/40 pt-3 space-y-2">
+            <div className="flex justify-between">
+              <Skeleton className="h-3 w-16" />
+              <Skeleton className="h-3 w-20" />
+            </div>
+            <div className="flex justify-between">
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-4 w-24" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
   if (!order) return <div className="max-w-xl mx-auto py-24 text-center text-sm text-charcoal-400">We couldn't find that order. <Link to="/orders" className="underline">Back to orders</Link></div>;
 
   const statusLower = (order.orderStatus || '').toLowerCase();
@@ -147,7 +207,11 @@ export default function OrderTrackingPage() {
         </div>
       </header>
 
-      {awaitingUpi && <UpiPaymentPanel order={order} onSubmitted={load} />}
+      {awaitingUpi && (
+        <Suspense fallback={<Skeleton className="h-64 w-full rounded-3xl" />}>
+          <UpiPaymentPanel order={order} onSubmitted={load} />
+        </Suspense>
+      )}
 
       {order.paymentMethod === 'cod' && !cancelled && (
         <div className="glass rounded-2xl p-4 text-xs text-charcoal-600">
@@ -197,7 +261,15 @@ export default function OrderTrackingPage() {
           <h2 className="font-display font-bold text-charcoal-700 flex items-center gap-2"><Package size={16} /> Items</h2>
           {order.items.map((item) => (
             <div key={item._id} className="flex gap-3 text-xs">
-              <img src={item.image} alt={item.name} className="w-14 h-[72px] object-cover rounded-xl bg-ivory-200" />
+              <img
+                src={item.image}
+                alt={item.name}
+                loading="lazy"
+                decoding="async"
+                width={56}
+                height={72}
+                className="w-14 h-[72px] object-cover rounded-xl bg-ivory-200"
+              />
               <div className="min-w-0 flex-1 space-y-0.5">
                 <p className="font-semibold text-charcoal-700 truncate">{item.name}</p>
                 <p className="text-charcoal-400">Qty {item.quantity}{item.size && ` · ${item.size}`}{item.color && ` · ${item.color}`} · Sold by {item.sellerNameSnapshot}</p>

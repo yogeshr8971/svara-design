@@ -855,7 +855,11 @@ export const getAllOrders = asyncHandler(async (req, res) => {
   const { page = 1, limit = 20, status, paymentStatus } = req.query;
   const filter = {};
   if (status) filter.orderStatus = status;
-  if (paymentStatus) filter.paymentStatus = paymentStatus;
+  if (paymentStatus === 'unpaid' || paymentStatus === 'pending') {
+    filter.paymentStatus = { $ne: 'paid' };
+  } else if (paymentStatus) {
+    filter.paymentStatus = paymentStatus;
+  }
 
   const skip = (Number(page) - 1) * Number(limit);
   const [orders, total] = await Promise.all([

@@ -132,6 +132,8 @@ export default function OrdersPage() {
       if (!matchNum && !matchCust) return false;
     }
     if (methodFilter && o.paymentMethod !== methodFilter) return false;
+    if (paymentFilter === 'paid' && o.paymentStatus !== 'paid') return false;
+    if (paymentFilter === 'unpaid' && o.paymentStatus === 'paid') return false;
     return true;
   });
 
@@ -180,7 +182,6 @@ export default function OrdersPage() {
           <option value="Ordered">1. Ordered</option>
           <option value="Shipped">2. Shipped</option>
           <option value="Delivered">3. Delivered</option>
-          <option value="pending_payment">Pending Payment (Unpaid)</option>
         </select>
 
         {/* Payment status filter */}
@@ -191,7 +192,7 @@ export default function OrdersPage() {
         >
           <option value="">All Payment States</option>
           <option value="paid">Paid (Collected)</option>
-          <option value="pending">Pending / Unpaid</option>
+          <option value="unpaid">Unpaid</option>
         </select>
 
         {/* Payment method filter */}

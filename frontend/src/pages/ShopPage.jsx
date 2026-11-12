@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search, SlidersHorizontal } from 'lucide-react';
 import ProductGrid from '../components/product/ProductGrid';
@@ -25,6 +25,15 @@ export default function ShopPage() {
   const [sort, setSort] = useState(searchParams.get('sort') || 'newest');
   const [maxPrice, setMaxPrice] = useState(10000);
   const [page, setPage] = useState(1);
+
+  const isFirstPageRun = useRef(true);
+  useEffect(() => {
+    if (isFirstPageRun.current) {
+      isFirstPageRun.current = false;
+      return;
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [page]);
 
   // Sync state with URL params
   useEffect(() => {

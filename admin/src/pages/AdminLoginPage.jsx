@@ -39,7 +39,7 @@ export default function AdminLoginPage() {
     return () => clearInterval(timer);
   }, [otpStep, otpCountdown]);
 
-  // 30-second resend cooldown timer
+  // 3-minute resend cooldown timer
   useEffect(() => {
     let timer;
     if (resendCooldown > 0) {
@@ -60,7 +60,7 @@ export default function AdminLoginPage() {
       if (res?.otpRequired) {
         setOtpStep(true);
         setOtpCountdown(180);
-        setResendCooldown(30);
+        setResendCooldown(180);
         toast.success('Sign-in code sent to your email. Expires in 3 minutes.');
       } else if (res?.user?.role === 'admin') {
         toast.success('Welcome back, Administrator.');
@@ -106,7 +106,7 @@ export default function AdminLoginPage() {
       setLoading(true);
       await login(email, password);
       setOtpCountdown(180);
-      setResendCooldown(30);
+      setResendCooldown(180);
       setOtp('');
       toast.success('New 3-minute code dispatched to your email.');
     } catch (err) {
@@ -238,7 +238,7 @@ export default function AdminLoginPage() {
                     className="text-xs font-semibold text-burgundy-600 hover:text-burgundy-800 disabled:text-charcoal-300 disabled:cursor-not-allowed transition-colors"
                   >
                     {resendCooldown > 0
-                      ? `Resend available in ${resendCooldown}s`
+                      ? `Resend available in ${formatTimer(resendCooldown)}`
                       : 'Request a new code'}
                   </button>
                 </div>

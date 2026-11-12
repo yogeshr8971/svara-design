@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 
 // Must match backend OTP_TTL_MS = Math.max(3, Number(process.env.OTP_TTL_MINUTES) || 3) * 60 * 1000 (at least 3 minutes = 180s)
 const CODE_EXPIRY_SECONDS = 180;
+const RESEND_COOLDOWN_SECONDS = 180;
 
 function formatCountdown(seconds) {
   const m = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -61,14 +62,14 @@ export default function ForgotPasswordPage() {
       toast.success('Reset code sent to your email.');
       setStep(2);
       setExpiryCountdown(CODE_EXPIRY_SECONDS);
-      setResendCooldown(30);
+      setResendCooldown(RESEND_COOLDOWN_SECONDS);
     } catch (err) {
       // Avoid leaking whether an email is registered (account enumeration)
       toast.success('If an account exists for that email, a reset code was sent.');
       // Still advance to step 2 so the user can try the code if they received it
       setStep(2);
       setExpiryCountdown(CODE_EXPIRY_SECONDS);
-      setResendCooldown(30);
+      setResendCooldown(RESEND_COOLDOWN_SECONDS);
     } finally {
       setSendingCode(false);
     }
@@ -80,7 +81,7 @@ export default function ForgotPasswordPage() {
       await authService.forgotPassword(email.trim());
       toast.success('New code sent to your email.');
       setExpiryCountdown(CODE_EXPIRY_SECONDS);
-      setResendCooldown(30);
+      setResendCooldown(RESEND_COOLDOWN_SECONDS);
       setOtp('');
     } catch {
       toast.error('Could not resend the code. Please try again.');
@@ -194,7 +195,7 @@ export default function ForgotPasswordPage() {
                   onClick={handleResend}
                   className="text-[11px] font-semibold text-champagne-600 disabled:text-charcoal-300"
                 >
-                  {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
+                  {resendCooldown > 0 ? `Resend in ${formatCountdown(resendCooldown)}` : 'Resend code'}
                 </button>
               </div>
             </div>
