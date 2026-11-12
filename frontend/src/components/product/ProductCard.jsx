@@ -1,6 +1,6 @@
 import React, { memo, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Heart, ShoppingBag, Wand2 } from 'lucide-react';
+import { Heart, ShoppingBag, Wand2, Star } from 'lucide-react';
 import { formatPrice } from '../../utils/formatPrice';
 import { useWishlist } from '../../context/WishlistContext';
 import { useCart } from '../../context/CartContext';
@@ -146,6 +146,17 @@ const ProductCard = memo(function ProductCard({ product, footer = null }) {
             {product.name}
           </h3>
         </Link>
+        <div className="flex items-center gap-1.5 text-[11px]">
+          {product.ratings?.count > 0 ? (
+            <span className="inline-flex items-center gap-1 font-semibold text-charcoal-700">
+              <Star size={11} className="fill-amber-400 text-amber-400" />
+              <span>{Number(product.ratings.average).toFixed(1)}</span>
+              <span className="text-charcoal-400 font-normal">({product.ratings.count})</span>
+            </span>
+          ) : (
+            <span className="text-charcoal-400 font-light">No reviews</span>
+          )}
+        </div>
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
           <span className="font-semibold text-charcoal-700 text-sm">{formatPrice(product.price)}</span>
           {discountPercent > 0 && (

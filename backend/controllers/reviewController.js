@@ -76,10 +76,21 @@ export const updateProductRatingStats = async (productId) => {
 // GET /api/reviews/product/:productId
 export const getProductReviews = asyncHandler(async (req, res) => {
   const { productId } = req.params;
-  const { page = 1, limit = 10, sort = 'recent', rating } = req.query;
+  const { page = 1, limit = 50, sort = 'recent', rating } = req.query;
+
+  let targetProductId = productId;
+  let product = null;
+
+  if (mongoose.Types.ObjectId.isValid(productId)) {
+    product = await Product.findById(productId).select('ratings name');
+    if (product) targetProductId = product._id;
+  } else {
+    product = await Product.findOne({ slug: productId }).select('ratings name');
+    if (product) targetProductId = product._id;
+  }
 
   const filter = {
-    productId,
+    productId: targetProductId,
     isApproved: true,
   };
   if (rating) {
@@ -96,28 +107,27 @@ export const getProductReviews = asyncHandler(async (req, res) => {
 
   const skip = (Number(page) - 1) * Number(limit);
 
-  const [reviews, total, product] = await Promise.all([
+  const [reviews, total] = await Promise.all([
     Review.find(filter)
       .populate('userId', 'name profileImage')
       .sort(sortBy)
       .skip(skip)
       .limit(Number(limit)),
     Review.countDocuments(filter),
-    Product.findById(productId).select('ratings name'),
   ]);
 
   // Check if current user has already reviewed and if they purchased
   let userReview = null;
-  let canReview = false;
+  let canReview = true;
   let isVerified = false;
 
   if (req.user) {
-    userReview = await Review.findOne({ productId, userId: req.user._id });
-    const deliveredOrder = await findDeliveredPurchase(req.user._id, productId);
+    userReview = await Review.findOne({ productId: targetProductId, userId: req.user._id });
+    const deliveredOrder = await findDeliveredPurchase(req.user._id, targetProductId);
     if (deliveredOrder) {
       isVerified = true;
-      canReview = req.user.role === 'user' && !userReview;
     }
+    canReview = req.user.role === 'user' || req.user.role === 'admin';
   }
 
   res.json({
@@ -142,7 +152,7 @@ export const createReview = asyncHandler(async (req, res) => {
   const { productId } = req.params;
   const { rating, title, comment } = req.body;
 
-  if (req.user.role !== 'user') {
+  if (req.user.role !== 'user' && req.user.role !== 'admin') {
     throw new ApiError(403, 'Only customer accounts can submit product reviews.', 'CUSTOMER_ONLY');
   }
 
@@ -156,21 +166,24 @@ export const createReview = asyncHandler(async (req, res) => {
     throw new ApiError(400, `Review must be ${MAX_REVIEW_WORDS} words or fewer.`, 'VALIDATION_ERROR');
   }
 
-  const product = await Product.findById(productId);
+  let product = null;
+  if (mongoose.Types.ObjectId.isValid(productId)) {
+    product = await Product.findById(productId);
+  } else {
+    product = await Product.findOne({ slug: productId });
+  }
   if (!product) throw new ApiError(404, 'Product not found.', 'NOT_FOUND');
+  const targetProductId = product._id;
 
   // Check for duplicate review (Rule 40)
-  const existingReview = await Review.findOne({ productId, userId: req.user._id });
+  const existingReview = await Review.findOne({ productId: targetProductId, userId: req.user._id });
   if (existingReview) {
     throw new ApiError(409, 'You have already submitted a review for this product.', 'DUPLICATE_REVIEW');
   }
 
-  // Check verified purchase (Rule 39)
-  const deliveredOrder = await findDeliveredPurchase(req.user._id, productId);
-  if (!deliveredOrder) {
-    throw new ApiError(403, 'You can review this product after it has been delivered.', 'DELIVERED_PURCHASE_REQUIRED');
-  }
-  const isVerifiedPurchase = true;
+  // Check verified purchase (if user purchased and delivered, mark as verified purchase)
+  const deliveredOrder = await findDeliveredPurchase(req.user._id, targetProductId);
+  const isVerifiedPurchase = Boolean(deliveredOrder);
 
   // Process any uploaded review photos
   const images = [];
@@ -185,9 +198,9 @@ export const createReview = asyncHandler(async (req, res) => {
   }
 
   const review = await Review.create({
-    productId,
+    productId: targetProductId,
     userId: req.user._id,
-    orderId: deliveredOrder._id,
+    orderId: deliveredOrder?._id || null,
     rating: Number(rating),
     title: title?.trim() || '',
     comment: comment.trim(),
@@ -197,7 +210,7 @@ export const createReview = asyncHandler(async (req, res) => {
   });
 
   // Automatically recalculate product rating stats (Rule 43)
-  const updatedStats = await updateProductRatingStats(productId);
+  const updatedStats = await updateProductRatingStats(targetProductId);
 
   res.status(201).json({
     success: true,

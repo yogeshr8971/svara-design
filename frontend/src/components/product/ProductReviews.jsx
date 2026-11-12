@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Star, ThumbsUp, CheckCircle, MessageSquare, ShieldCheck, Edit3, Trash2 } from 'lucide-react';
 import Button from '../ui/Button';
 import Spinner from '../ui/Spinner';
@@ -13,8 +14,9 @@ const limitWords = (v) => {
   return w.length <= MAX_WORDS ? v : w.slice(0, MAX_WORDS).join(' ');
 };
 
-export default function ProductReviews({ productId }) {
+export default function ProductReviews({ productId, onRatingsUpdate }) {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const [reviews, setReviews] = useState([]);
   const [summary, setSummary] = useState(null);
@@ -32,6 +34,24 @@ export default function ProductReviews({ productId }) {
 
   const wordCount = (comment || '').trim().split(/\s+/).filter(Boolean).length;
 
+  const handleOpenForm = () => {
+    if (!user) {
+      toast('Please sign in to write a review', { icon: '✍️' });
+      navigate('/login');
+      return;
+    }
+    if (userReview) {
+      setRating(userReview.rating || 5);
+      setTitle(userReview.title || '');
+      setComment(userReview.comment || '');
+    } else {
+      setRating(5);
+      setTitle('');
+      setComment('');
+    }
+    setShowForm(true);
+  };
+
   const fetchReviews = async () => {
     try {
       setLoading(true);
@@ -40,6 +60,9 @@ export default function ProductReviews({ productId }) {
       setSummary(data.ratingsSummary || null);
       setCanReview(Boolean(data.canReview));
       setUserReview(data.userReview || null);
+      if (onRatingsUpdate && data.ratingsSummary) {
+        onRatingsUpdate(data.ratingsSummary);
+      }
 
       if (data.userReview) {
         setRating(data.userReview.rating || 5);
@@ -116,7 +139,7 @@ export default function ProductReviews({ productId }) {
   const distribution = summary?.distribution || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
 
   return (
-    <section className="space-y-8 pt-10 border-t border-ivory-300/40">
+    <section id="reviews-section" className="space-y-8 pt-10 border-t border-ivory-300/40">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -128,8 +151,8 @@ export default function ProductReviews({ productId }) {
           </h2>
         </div>
 
-        {canReview && !showForm && (
-          <Button variant="primary" size="sm" onClick={() => setShowForm(true)}>
+        {!showForm && (
+          <Button variant="primary" size="sm" onClick={handleOpenForm}>
             <MessageSquare size={14} />
             <span>{userReview ? 'Edit Your Review' : 'Write a Review'}</span>
           </Button>
@@ -156,7 +179,9 @@ export default function ProductReviews({ productId }) {
               />
             ))}
           </div>
-          <p className="text-xs text-charcoal-400">Based on {totalCount} verified rating{totalCount !== 1 ? 's' : ''}</p>
+          <p className="text-xs text-charcoal-400">
+            {totalCount > 0 ? `Based on ${totalCount} rating${totalCount !== 1 ? 's' : ''}` : 'No reviews yet'}
+          </p>
         </div>
 
         {/* Rating Bars Breakdown */}
@@ -275,10 +300,16 @@ export default function ProductReviews({ productId }) {
             <Spinner size="md" />
           </div>
         ) : reviews.length === 0 ? (
-          <div className="glass rounded-3xl p-12 text-center text-xs text-charcoal-400 space-y-2">
+          <div className="glass rounded-3xl p-12 text-center text-xs text-charcoal-400 space-y-3">
             <MessageSquare size={28} className="mx-auto text-charcoal-300" />
             <p className="font-semibold text-charcoal-600">No reviews yet for this design.</p>
-            <p>Be the first verified patron to share your styling feedback.</p>
+            <p>Be the first to share your styling feedback.</p>
+            {!showForm && (
+              <Button variant="outline" size="sm" onClick={handleOpenForm} className="mt-2">
+                <MessageSquare size={14} />
+                <span>Write the First Review</span>
+              </Button>
+            )}
           </div>
         ) : (
           <div className="space-y-4">

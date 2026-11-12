@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Heart, Sparkles, ShoppingBag, Wand2, ShieldCheck, RefreshCw } from 'lucide-react';
+import { Heart, Sparkles, ShoppingBag, Wand2, ShieldCheck, RefreshCw, Star } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Spinner from '../components/ui/Spinner';
 import ProductCard from '../components/product/ProductCard';
@@ -131,6 +131,33 @@ export default function ProductDetailPage() {
             <h1 className="font-display text-3xl sm:text-4xl font-bold text-charcoal-700 mt-1">
               {product.name}
             </h1>
+
+            {/* Rating Badge in Product Opening */}
+            <div className="mt-2.5 flex items-center gap-2">
+              {product.ratings?.count > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => document.getElementById('reviews-section')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200/80 text-xs font-semibold text-charcoal-800 hover:bg-amber-100 transition-colors shadow-2xs cursor-pointer"
+                >
+                  <Star size={13} className="fill-amber-400 text-amber-400" />
+                  <span>{Number(product.ratings.average).toFixed(1)}</span>
+                  <span className="text-charcoal-400 font-normal">
+                    · {product.ratings.count} {product.ratings.count === 1 ? 'review' : 'reviews'}
+                  </span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => document.getElementById('reviews-section')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-ivory-100/80 border border-ivory-200 text-xs font-medium text-charcoal-400 hover:bg-ivory-200 transition-colors cursor-pointer"
+                >
+                  <Star size={13} className="text-charcoal-300" />
+                  <span>No reviews</span>
+                </button>
+              )}
+            </div>
+
             <div className="flex items-center gap-3 mt-3 flex-wrap">
               <span className="font-display text-2xl font-bold text-charcoal-800">
                 {formatPrice(product.price)}
@@ -269,7 +296,12 @@ export default function ProductDetailPage() {
       )}
 
       {/* Customer Reviews & Ratings Section (Phase 5) */}
-      <ProductReviews productId={product._id} />
+      <ProductReviews
+        productId={product._id}
+        onRatingsUpdate={(newRatings) => {
+          setProduct((prev) => (prev ? { ...prev, ratings: newRatings } : prev));
+        }}
+      />
     </div>
   );
 }
