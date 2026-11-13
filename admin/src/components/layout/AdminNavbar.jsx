@@ -38,7 +38,7 @@ export default function AdminNavbar({ onToggleMobileSidebar = () => {} }) {
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         {/* Storefront Link */}
         <a
-          href={import.meta.env.VITE_STOREFRONT_URL || 'https://svara-shop.netlify.app/'}
+          href={import.meta.env.VITE_STOREFRONT_URL || 'https://svara-shop.vercel.app/'}
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium text-charcoal-600 hover:text-burgundy-600 hover:bg-ivory-100 transition-colors"
